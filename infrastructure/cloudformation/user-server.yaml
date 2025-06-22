@@ -1,0 +1,183 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AutoBlitz User Server - t4g.nano Instance with EIP'
+
+Parameters:
+  UserName:
+    Type: String
+    Description: 'Unique username for the server'
+    MinLength: 3
+    MaxLength: 20
+    AllowedPattern: '[a-zA-Z0-9-]+'
+  
+  KeyPairName:
+    Type: String
+    Description: 'EC2 Key Pair for SSH access'
+    Default: 'autoblitz-key'
+
+Resources:
+  UserVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'autoblitz-vpc-${UserName}'
+        - Key: Project
+          Value: AutoBlitz
+
+  UserSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref UserVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'autoblitz-subnet-${UserName}'
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub 'autoblitz-igw-${UserName}'
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref UserVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref UserVPC
+      Tags:
+        - Key: Name
+          Value: !Sub 'autoblitz-rt-${UserName}'
+
+  Route:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref UserSubnet
+      RouteTableId: !Ref RouteTable
+
+  UserServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub 'autoblitz-sg-${UserName}'
+      GroupDescription: 'Security group for AutoBlitz user server'
+      VpcId: !Ref UserVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+          Description: 'SSH access'
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0
+          Description: 'FastAPI application'
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: 'All outbound traffic'
+      Tags:
+        - Key: Name
+          Value: !Sub 'autoblitz-sg-${UserName}'
+
+  UserServerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'autoblitz-role-${UserName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+
+  UserServerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub 'autoblitz-profile-${UserName}'
+      Roles:
+        - !Ref UserServerRole
+
+  UserServerInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0c9c942bd7bf113a2
+      InstanceType: t4g.nano
+      KeyName: !Ref KeyPairName
+      SubnetId: !Ref UserSubnet
+      SecurityGroupIds:
+        - !Ref UserServerSecurityGroup
+      IamInstanceProfile: !Ref UserServerInstanceProfile
+      Monitoring: true
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y docker git htop python3.11
+          systemctl start docker
+          systemctl enable docker
+          usermod -a -G docker ec2-user
+          mkdir -p /home/ec2-user/autoblitz
+          chown ec2-user:ec2-user /home/ec2-user/autoblitz
+          echo "AutoBlitz Ready: ${UserName}" > /var/log/autoblitz-ready.log
+      Tags:
+        - Key: Name
+          Value: !Sub 'autoblitz-server-${UserName}'
+        - Key: Project
+          Value: AutoBlitz
+
+  UserServerEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub 'autoblitz-eip-${UserName}'
+
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref UserServerInstance
+      EIP: !Ref UserServerEIP
+
+Outputs:
+  VPCId:
+    Description: 'VPC ID'
+    Value: !Ref UserVPC
+  
+  InstanceId:
+    Description: 'EC2 Instance ID'
+    Value: !Ref UserServerInstance
+  
+  ElasticIP:
+    Description: 'Elastic IP Address'
+    Value: !Ref UserServerEIP
+  
+  SSHCommand:
+    Description: 'SSH Command'
+    Value: !Sub 'ssh -i autoblitz-key.pem ec2-user@${UserServerEIP}'
+  
+  EstimatedMonthlyCost:
+    Description: 'Estimated monthly cost USD'
+    Value: '4.40'
