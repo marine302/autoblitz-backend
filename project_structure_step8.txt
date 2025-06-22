@@ -1,0 +1,39 @@
+app/strategies/
+├── __init__.py
+├── __pycache__
+│   └── __init__.cpython-312.pyc
+├── core
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-312.pyc
+│   │   ├── strategy_base.cpython-312.pyc
+│   │   └── strategy_manager.cpython-312.pyc
+│   ├── strategy_base.py
+│   └── strategy_manager.py
+├── plugins
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-312.pyc
+│   │   └── simple_momentum.cpython-312.pyc
+│   └── simple_momentum.py
+└── utils
+    ├── __init__.py
+    ├── __pycache__
+    │   ├── __init__.cpython-312.pyc
+    │   └── strategy_utils.cpython-312.pyc
+    └── strategy_utils.py
+
+8 directories, 16 files
+total 52
+drwxrwxrwx+ 3 codespace codespace  4096 Jun 22 19:34 .
+drwxrwxrwx+ 6 codespace codespace  4096 Jun 22 19:34 ..
+-rw-rw-rw-  1 codespace codespace    23 Jun 22 19:33 __init__.py
+drwxrwxrwx+ 2 codespace codespace  4096 Jun 22 19:34 __pycache__
+-rw-rw-rw-  1 codespace codespace 12848 Jun 22 19:29 strategy_base.py
+-rw-rw-rw-  1 codespace codespace 18894 Jun 22 19:29 strategy_manager.py
+total 32
+drwxrwxrwx+ 3 codespace codespace  4096 Jun 22 19:34 .
+drwxrwxrwx+ 6 codespace codespace  4096 Jun 22 19:34 ..
+-rw-rw-rw-  1 codespace codespace    22 Jun 22 19:33 __init__.py
+drwxrwxrwx+ 2 codespace codespace  4096 Jun 22 19:34 __pycache__
+-rw-rw-rw-  1 codespace codespace 15092 Jun 22 19:32 simple_momentum.py
