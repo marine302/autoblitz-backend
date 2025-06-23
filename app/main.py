@@ -23,6 +23,7 @@ from .monitoring import (
     measure_api_call,
     record_api_performance
 )
+from .api.v1.trading import router as trading_router, cleanup_trading_systems
 
 # 로깅 설정
 logging.basicConfig(
@@ -163,6 +164,11 @@ async def monitoring_dashboard():
 
 # API 라우터 등록 (기존 v1 구조 활용)
 app.include_router(api_router)
+app.include_router(trading_router)
+
+# 전략 API 라우터 추가
+from app.api.v1.strategies import router as strategies_router
+app.include_router(strategies_router, prefix="/api/v1", tags=["strategies"])
 
 if __name__ == "__main__":
     import uvicorn
@@ -173,6 +179,3 @@ if __name__ == "__main__":
         reload=True,
         log_level="info"
     )
-# 전략 API 라우터 추가
-from app.api.v1.strategies import router as strategies_router
-app.include_router(strategies_router, prefix="/api/v1", tags=["strategies"])
