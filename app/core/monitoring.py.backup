@@ -1,0 +1,130 @@
+"""
+모니터링 시스템
+CloudWatch 메트릭 수집 및 시스템 상태 모니터링
+"""
+
+import time
+import psutil
+from typing import Dict, Any, Optional
+from datetime import datetime
+import boto3
+from botocore.exceptions import ClientError
+import os
+
+from .config import get_settings
+
+settings = get_settings()
+
+# 개발 환경에서 CloudWatch 비활성화
+DEVELOPMENT_MODE = os.getenv('ENVIRONMENT', 'development') == 'development'
+
+class SystemMonitor:
+    """시스템 리소스 모니터링"""
+    
+    def __init__(self):
+        self.cloudwatch = None
+        # 개발 환경에서는 CloudWatch 연결하지 않음
+        if not DEVELOPMENT_MODE and settings.AWS_ACCESS_KEY_ID:
+            try:
+                self.cloudwatch = boto3.client(
+                    'cloudwatch',
+                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                    region_name=settings.AWS_REGION
+                )
+            except Exception:
+                self.cloudwatch = None
+    
+    def get_system_metrics(self) -> Dict[str, Any]:
+        """시스템 메트릭 수집"""
+        try:
+            return {
+                'cpu_percent': psutil.cpu_percent(interval=1),
+                'memory_percent': psutil.virtual_memory().percent,
+                'memory_used_mb': psutil.virtual_memory().used / 1024 / 1024,
+                'disk_percent': psutil.disk_usage('/').percent,
+                'timestamp': datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            return {'error': str(e), 'timestamp': datetime.utcnow().isoformat()}
+    
+    def send_metrics_to_cloudwatch(self, metrics: Dict[str, Any]) -> bool:
+        """CloudWatch로 메트릭 전송"""
+        if DEVELOPMENT_MODE or not self.cloudwatch:
+            # 개발 환경에서는 로그만 출력 (에러 없이)
+            print(f"\ud83d\udcca [DEV] \uc2dc\uc2a4\ud15c \uba54\ud2b8\ub9ad: CPU {metrics.get('cpu_percent', 0):.1f}%, \uba54\ubaa8\ub9ac {metrics.get('memory_percent', 0):.1f}%")
+            return True
+        
+        try:
+            self.cloudwatch.put_metric_data(
+                Namespace='AutoBlitz/System',
+                MetricData=[
+                    {
+                        'MetricName': 'CPUUtilization',
+                        'Value': metrics.get('cpu_percent', 0),
+                        'Unit': 'Percent',
+                        'Timestamp': datetime.utcnow()
+                    },
+                    {
+                        'MetricName': 'MemoryUtilization', 
+                        'Value': metrics.get('memory_percent', 0),
+                        'Unit': 'Percent',
+                        'Timestamp': datetime.utcnow()
+                    }
+                ]
+            )
+            return True
+        except ClientError:
+            return False
+
+
+class PerformanceTracker:
+    """API 성능 추적"""
+    
+    def __init__(self):
+        self.metrics = {}
+        self.monitor = SystemMonitor()
+    
+    def track_api_call(self, endpoint: str, duration: float, status_code: int):
+        """API 호출 추적"""
+        if endpoint not in self.metrics:
+            self.metrics[endpoint] = {
+                'total_calls': 0,
+                'total_duration': 0,
+                'error_count': 0,
+                'last_call': None
+            }
+        
+        self.metrics[endpoint]['total_calls'] += 1
+        self.metrics[endpoint]['total_duration'] += duration
+        self.metrics[endpoint]['last_call'] = datetime.utcnow().isoformat()
+        
+        if status_code >= 400:
+            self.metrics[endpoint]['error_count'] += 1
+    
+    def get_performance_summary(self) -> Dict[str, Any]:
+        """성능 요약 조회"""
+        summary = {}
+        for endpoint, data in self.metrics.items():
+            avg_duration = data['total_duration'] / data['total_calls'] if data['total_calls'] > 0 else 0
+            error_rate = data['error_count'] / data['total_calls'] if data['total_calls'] > 0 else 0
+            
+            summary[endpoint] = {
+                'total_calls': data['total_calls'],
+                'average_duration_ms': round(avg_duration * 1000, 2),
+                'error_rate': round(error_rate * 100, 2),
+                'last_call': data['last_call']
+            }
+        
+        # 시스템 메트릭 추가
+        summary['system'] = self.monitor.get_system_metrics()
+        return summary
+
+
+# 전역 성능 추적기
+performance_tracker = PerformanceTracker()
+
+
+def get_performance_tracker() -> PerformanceTracker:
+    """성능 추적기 인스턴스 반환"""
+    return performance_tracker

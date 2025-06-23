@@ -1,0 +1,26 @@
+=== 오토블리츠 Step_8 완료 - 프로젝트 구조 ===
+생성일: Sun Jun 22 19:52:23 UTC 2025
+
+1. 전략 시스템 파일 구조:
+app/strategies/utils/strategy_utils.py
+app/strategies/utils/__init__.py
+app/strategies/plugins/simple_momentum.py
+app/strategies/plugins/__init__.py
+app/strategies/core/strategy_manager.py
+app/strategies/core/__init__.py
+app/strategies/core/strategy_base.py
+app/strategies/__init__.py
+
+2. 핵심 파일 라인 수:
+  482 app/strategies/utils/strategy_utils.py
+    1 app/strategies/utils/__init__.py
+  405 app/strategies/plugins/simple_momentum.py
+    1 app/strategies/plugins/__init__.py
+  545 app/strategies/core/strategy_manager.py
+    1 app/strategies/core/__init__.py
+  396 app/strategies/core/strategy_base.py
+    1 app/strategies/__init__.py
+ 1832 total
+
+3. 테스트 파일:
+-rw-rw-rw- 1 codespace codespace 11802 Jun 22 19:32 tests/test_strategies.py

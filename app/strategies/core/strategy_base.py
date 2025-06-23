@@ -90,6 +90,18 @@ class BacktestResult:
     avg_loss: float           # 평균 손실
 
 
+@dataclass
+class Position:
+    """포지션 정보"""
+    symbol: str
+    side: str  # LONG, SHORT
+    size: float
+    entry_price: float
+    entry_time: datetime
+    current_price: Optional[float] = None
+    unrealized_pnl: Optional[float] = None
+
+
 class StrategyBase(ABC):
     """
     모든 거래 전략의 기본 클래스

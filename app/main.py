@@ -97,46 +97,6 @@ app.add_middleware(
 
 # 모니터링 미들웨어
 @app.middleware("http")
-async def monitoring_middleware(request: Request, call_next):
-    """API 호출 모니터링 미들웨어"""
-    start_time = time.time()
-    
-    # 사용자 ID 추출 (있는 경우)
-    user_id = getattr(request.state, 'user_id', None)
-    
-    try:
-        # API 호출 측정 시작
-        async with measure_api_call(
-            endpoint=request.url.path,
-            method=request.method,
-            user_id=user_id
-        ):
-            response = await call_next(request)
-        
-        # 성공한 요청의 성능 기록
-        response_time = (time.time() - start_time) * 1000
-        await record_api_performance(
-            endpoint=request.url.path,
-            method=request.method,
-            status_code=response.status_code,
-            response_time=response_time,
-            user_id=user_id
-        )
-        
-        return response
-        
-    except Exception as e:
-        # 실패한 요청의 성능 기록
-        response_time = (time.time() - start_time) * 1000
-        await record_api_performance(
-            endpoint=request.url.path,
-            method=request.method,
-            status_code=500,
-            response_time=response_time,
-            user_id=user_id
-        )
-        raise
-
 # Rate Limiting 미들웨어
 @app.middleware("http")
 async def rate_limiting_middleware(request: Request, call_next):
@@ -213,3 +173,6 @@ if __name__ == "__main__":
         reload=True,
         log_level="info"
     )
+# 전략 API 라우터 추가
+from app.api.v1.strategies import router as strategies_router
+app.include_router(strategies_router, prefix="/api/v1", tags=["strategies"])

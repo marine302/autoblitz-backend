@@ -156,7 +156,7 @@ async def get_scalping_strategy_signals(
     try:
         # 심볼 목록 처리
         if symbols:
-            symbol_list = [s.strip() for s in symbols.split(',')] if isinstance(symbols, str) else ['BTC-USDT', 'ETH-USDT', 'BNB-USDT']
+            symbol_list = [s.strip() for s in symbols.split(',')]
         else:
             # 기본 주요 코인들
             symbol_list = ['BTC-USDT', 'ETH-USDT', 'BNB-USDT', 'XRP-USDT', 'ADA-USDT']
