@@ -25,7 +25,11 @@ from .monitoring import (
 )
 from .api.v1.trading import router as trading_router, cleanup_trading_systems
 
-# Phase 2A: 코인 추천 시스템 라우터 추가
+# 기존 라우터들
+from app.strategies.api.strategy_api import router as strategy_router
+from app.strategies.api.monitoring_api import router as monitoring_router
+
+# 새로운 분석 라우터
 from app.analysis.coin_recommendation.api.recommendation_api import router as recommendation_router
 
 # 로깅 설정
@@ -75,9 +79,9 @@ async def lifespan(app: FastAPI):
 
 # FastAPI 앱 생성
 app = FastAPI(
-    title="AutoBlitz Phase 2A - AI 코인 추천 시스템",
-    description="암호화폐 자동매매 SaaS 백엔드 서버 + 5개 거래소 통합 AI 분석",
-    version="2.0.0",
+    title="AutoBlitz Backend API",
+    description="암호화폐 자동매매 SaaS 백엔드 서버 (모니터링 통합)",
+    version="1.1.0",
     lifespan=lifespan
 )
 
@@ -99,6 +103,8 @@ app.add_middleware(
     allowed_hosts=["*"]  # 개발용, 운영에서는 제한 필요
 )
 
+# 모니터링 미들웨어
+@app.middleware("http")
 # Rate Limiting 미들웨어
 @app.middleware("http")
 async def rate_limiting_middleware(request: Request, call_next):
@@ -119,32 +125,16 @@ async def rate_limiting_middleware(request: Request, call_next):
 async def read_root():
     """기본 엔드포인트"""
     return {
-        "message": "🚀 AutoBlitz Phase 2A - AI 코인 추천 시스템",
-        "version": "2.0.0",
-        "phase": "2A - 백엔드 분석 시스템 확장",
+        "message": "Hello AutoBlitz Backend!",
+        "version": "1.1.0",
         "features": [
             "JWT Authentication",
-            "Database Integration", 
+            "Database Integration",
             "Cache System",
             "Rate Limiting",
             "CloudWatch Monitoring",
-            "Real-time Alerts",
-            "🎯 5개 거래소 통합 코인 추천",
-            "🌍 실시간 마켓 데이터 통합", 
-            "📊 AI 기반 기술적 분석",
-            "⚡ 차익거래 기회 자동 탐지",
-            "💎 포트폴리오 최적화 분석"
-        ],
-        "supported_exchanges": [
-            "OKX", "업비트", "바이낸스", "코인베이스", "크라켄"
-        ],
-        "endpoints": {
-            "auth": "/api/v1/auth",
-            "strategies": "/api/v1/strategies",
-            "trading": "/api/v1/trading",
-            "recommendations": "/api/v1/recommendations",
-            "monitoring": "/monitoring"
-        }
+            "Real-time Alerts"
+        ]
     }
 
 @app.get("/health")
@@ -156,16 +146,9 @@ async def health_check():
         return {
             "status": "healthy",
             "timestamp": time.time(),
-            "phase": "2A",
-            "version": "2.0.0",
             "database": "connected",
-            "cache": "available", 
-            "monitoring": monitoring_status,
-            "systems": {
-                "trading_engine": "operational",
-                "recommendation_engine": "operational",
-                "exchange_connections": "operational"
-            }
+            "cache": "available",
+            "monitoring": monitoring_status
         }
     except Exception as e:
         logger.error(f"헬스체크 실패: {e}")
@@ -194,8 +177,44 @@ app.include_router(trading_router)
 from app.api.v1.strategies import router as strategies_router
 app.include_router(strategies_router, prefix="/api/v1", tags=["strategies"])
 
+# 기존 라우터들
+app.include_router(strategy_router)
+app.include_router(monitoring_router)
+
 # Phase 2A: 코인 추천 시스템 라우터 추가
 app.include_router(recommendation_router)
+
+@app.get("/")
+async def root():
+    return {
+        "message": "오토블리츠 Phase 2A - AI 코인 추천 시스템",
+        "version": "2.0.0",
+        "features": [
+            "7단계 물타기 자동매매",
+            "5개 거래소 통합 분석",
+            "AI 기반 코인 추천",
+            "실시간 차익거래 탐지",
+            "포트폴리오 최적화"
+        ],
+        "endpoints": {
+            "strategies": "/api/v1/strategies",
+            "monitoring": "/api/v1/monitoring", 
+            "recommendations": "/api/v1/recommendations"
+        }
+    }
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "timestamp": "2025-06-24",
+        "phase": "2A",
+        "systems": {
+            "trading_engine": "operational",
+            "recommendation_engine": "operational",
+            "exchange_connections": "operational"
+        }
+    }
 
 if __name__ == "__main__":
     import uvicorn
