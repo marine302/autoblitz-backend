@@ -19,9 +19,7 @@ from .api.v1.router import api_router
 from .monitoring import (
     init_monitoring, 
     shutdown_monitoring, 
-    get_monitoring_status,
-    measure_api_call,
-    record_api_performance
+    get_monitoring_status
 )
 from .api.v1.trading import router as trading_router, cleanup_trading_systems
 
@@ -99,11 +97,11 @@ app.add_middleware(
     allowed_hosts=["*"]  # 개발용, 운영에서는 제한 필요
 )
 
-# Rate Limiting 미들웨어
 @app.middleware("http")
 async def rate_limiting_middleware(request: Request, call_next):
     """요청 제한 미들웨어"""
-    client_ip = request.client.host
+    # request.client이 None일 수 있으므로 안전하게 처리
+    client_ip = getattr(request.client, 'host', '127.0.0.1') if request.client else '127.0.0.1'
     
     if not await rate_limiter.is_allowed(client_ip):
         raise HTTPException(
