@@ -1,0 +1,141 @@
+# 📁 app/api/v1/strategies.py
+"""
+전략 API 엔드포인트 - 본사서버 신호 제공 시스템
+Created: 2025.06.24 00:48 KST
+Fixed: 2025.06.24 00:52 KST - 기존 strategy_base.py 구조 호환
+Purpose: 사용자서버가 호출할 수 있는 전략 신호 API
+"""
+from fastapi import APIRouter, HTTPException, Query
+from typing import List, Optional, Dict, Any
+from datetime import datetime
+from pydantic import BaseModel
+import asyncio
+import logging
+
+# 기존 구조와 호환되는 import (일단 기본만)
+from app.strategies.utils.okx_client_fixed import FixedMarketScanner
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+# 응답 모델 정의
+class SignalResponse(BaseModel):
+    """신호 응답 모델"""
+    symbol: str
+    signal_type: str  # BUY, SELL, HOLD
+    confidence: float
+    timestamp: datetime
+    strategy_name: str
+    conditions_met: List[str]
+    market_data: Dict[str, Any]
+
+class StrategyListResponse(BaseModel):
+    """전략 목록 응답"""
+    strategy_id: str
+    strategy_name: str
+    description: str
+    category: str
+    is_active: bool
+
+class MarketScanResponse(BaseModel):
+    """시장 스캔 응답"""
+    scan_timestamp: datetime
+    total_coins_scanned: int
+    signals_found: int
+    signals: List[SignalResponse]
+    scan_duration_ms: int
+
+# 전역 스캐너 인스턴스
+_market_scanner: Optional[FixedMarketScanner] = None
+
+async def get_market_scanner():
+    """마켓 스캐너 싱글톤 패턴"""
+    global _market_scanner
+    if _market_scanner is None:
+        _market_scanner = FixedMarketScanner()
+        await _market_scanner.initialize()
+    return _market_scanner
+
+@router.get("/strategies", response_model=List[StrategyListResponse])
+async def get_available_strategies():
+    """사용 가능한 전략 목록 조회"""
+    strategies = [
+        {
+            "strategy_id": "basic_scanning",
+            "strategy_name": "기본 스캐닝 전략",
+            "description": "실시간 시장 스캔을 통한 변동성 기반 신호 생성",
+            "category": "market_scanning",
+            "is_active": True
+        },
+        {
+            "strategy_id": "scalping_strategy", 
+            "strategy_name": "단타로 전략",
+            "description": "기술적 분석 기반 단타 매매 전략",
+            "category": "technical_analysis",
+            "is_active": True
+        }
+    ]
+    
+    return [StrategyListResponse(**strategy) for strategy in strategies]
+
+@router.get("/strategies/basic_scanning/signals", response_model=MarketScanResponse)
+async def get_basic_scanning_signals(
+    limit: int = Query(default=30, description="스캔할 코인 수", ge=1, le=100)
+):
+    """기본 스캐닝 전략 신호 조회"""
+    start_time = datetime.now()
+    
+    try:
+        scanner = await get_market_scanner()
+        signals_data = await scanner.scan_top_coins(limit)
+        
+        # 응답 형식으로 변환
+        signals = []
+        for signal_data in signals_data:
+            signal_response = SignalResponse(
+                symbol=signal_data['symbol'],
+                signal_type=signal_data['signal_type'],
+                confidence=signal_data['confidence'],
+                timestamp=signal_data['market_data']['timestamp'],
+                strategy_name="기본 스캐닝 전략",
+                conditions_met=signal_data['conditions_met'],
+                market_data=signal_data['market_data']
+            )
+            signals.append(signal_response)
+        
+        scan_duration = (datetime.now() - start_time).total_seconds() * 1000
+        
+        return MarketScanResponse(
+            scan_timestamp=start_time,
+            total_coins_scanned=limit,
+            signals_found=len(signals),
+            signals=signals,
+            scan_duration_ms=int(scan_duration)
+        )
+        
+    except Exception as e:
+        logger.error(f"기본 스캐닝 신호 조회 오류: {e}")
+        raise HTTPException(status_code=500, detail=f"신호 조회 실패: {str(e)}")
+
+@router.get("/strategies/health")
+async def strategy_health_check():
+    """전략 시스템 헬스체크"""
+    try:
+        scanner = await get_market_scanner()
+        test_tickers = await scanner.okx_client.get_multiple_tickers()
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now(),
+            "okx_connection": "ok" if test_tickers else "error",
+            "strategies_loaded": 2,
+            "message": "전략 시스템 정상 동작 중"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error", 
+            "timestamp": datetime.now(),
+            "error": str(e),
+            "message": "전략 시스템 오류 발생"
+        }
